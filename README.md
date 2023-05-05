@@ -1,4 +1,5 @@
 Bot Saloon
+
 Bot Saloon est un bot Discord qui gère les stocks et la comptabilité d'un saloon. Le bot permet aux utilisateurs de vendre des produits et d'en acheter, et maintient une trace de toutes les transactions effectuées.
 
 Prérequis
@@ -15,11 +16,10 @@ Ouvrez le projet dans PyCharm et installez les bibliothèques requises en exécu
 
 Ajoutez un fichier config.json à la racine du projet. Ce fichier doit contenir les informations de configuration suivantes :
 
-json
-Copy code
 {
   "token": "Votre jeton Discord ici"
 }
+
 Exécutez le script en utilisant la commande python botsaloon.py dans le terminal.
 
 Invitez le bot à votre serveur Discord en utilisant le lien d'invitation généré par l'application Discord.
