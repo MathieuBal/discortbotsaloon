@@ -1,0 +1,18 @@
+{
+    "nourriture": [
+        {"nom": "thon en boite", "quantite": 0, "prix_achat": 0.60, "prix_vente": 0.80},
+        {"nom": "plat-peche flottante", "quantite": 14, "prix_achat": 1.0, "prix_vente": 1.50}
+
+
+    ],
+    "boissons": [
+        {"nom": "whisky 20 ans", "quantite": 15, "prix_achat": 1.5, "prix_vente": 2.0},
+        {"nom": "whisky", "quantite": 1, "prix_achat": 0.59, "prix_vente": 1.0},
+        {"nom": "Bouteille eau", "quantite": 6, "prix_achat": 0.14, "prix_vente": 0.20}
+
+    ],
+    "tabac": [
+        {"nom": "pipe", "quantite": 2, "prix_achat": 0.15, "prix_vente": 0.20},
+        {"nom": "cigarette", "quantite": 7, "prix_achat": 12.0, "prix_vente": 25.0}
+    ]
+}
