@@ -1,4 +1,5 @@
 Bot Saloon
+
 Bot Saloon est un bot Discord qui gère les stocks et la comptabilité d'un saloon. Le bot permet aux utilisateurs de vendre des produits et d'en acheter, et maintient une trace de toutes les transactions effectuées.
 
 Prérequis
