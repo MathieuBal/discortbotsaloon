@@ -2,9 +2,11 @@ import asyncio
 import json
 import os
 import sys
+import time
 import asyncpg
 import discord
 from discord.ext import commands
+import mysql.connector
 
 intents = discord.Intents.all()
 intents.messages = True
@@ -14,24 +16,89 @@ intents.presences = False
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 
-async def connect_to_db():
-    bot.pg_con = await asyncpg.connect(user='postgres', password='21052105',
-                                       database='saloon_db', host='localhost')
+bot.pg_con = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="",
+    database="saloonv.2"
+)
+cursor = bot.pg_con.cursor()
 
-# Charger les stocks et la comptabilité depuis les fichiers JSON
-with open("stocks.json", "r") as f:
-    item_stock = json.load(f)
-
-with open("accounting.json", "r") as f:
-    accounting_data = json.load(f)
 
 # Chargez le token depuis le fichier config.json
 with open("config.json", "r") as f:
     config = json.load(f)
 
-with open("salaries.json", "r") as f:
-    salaries_data = json.load(f)
+item_stock = {}
+accounting_data = {}
+salaries_data = {}
 
+cursor.execute("SELECT name, quantity, purchase_price, selling_price FROM drinks")
+rows = cursor.fetchall()
+for row in rows:
+    name = row[0]
+    quantity = row[1]
+    purchase_price = row[2]
+    selling_price = row[3]
+    if 'boissons' in item_stock:
+        item_stock['boissons'].append({
+            'nom': name,
+            'quantite': quantity,
+            'prix_achat': purchase_price,
+            'prix_vente': selling_price
+        })
+    else:
+        item_stock['boissons'] = [{
+            'nom': name,
+            'quantite': quantity,
+            'prix_achat': purchase_price,
+            'prix_vente': selling_price
+        }]
+
+cursor.execute("SELECT name, quantity, purchase_price, selling_price FROM meals")
+rows = cursor.fetchall()
+for row in rows:
+    name = row[0]
+    quantity = row[1]
+    purchase_price = row[2]
+    selling_price = row[3]
+    if 'nourriture' in item_stock:
+        item_stock['nourriture'].append({
+            'nom': name,
+            'quantite': quantity,
+            'prix_achat': purchase_price,
+            'prix_vente': selling_price
+        })
+    else:
+        item_stock['nourriture'] = [{
+            'nom': name,
+            'quantite': quantity,
+            'prix_achat': purchase_price,
+            'prix_vente': selling_price
+        }]
+
+cursor.execute("SELECT employee_id, salary FROM salaries")
+rows = cursor.fetchall()
+for row in rows:
+    employee_id = row[0]
+    salary = row[1]
+    salaries_data[employee_id] = salary
+
+cursor.execute("SELECT total_money, revenue, tax_rate, profit, commission_percentage FROM accounting")
+rows = cursor.fetchall()
+for row in rows:
+    total_money = row[0]
+    revenue = row[1]
+    tax_rate = row[2]
+    profit = row[3]
+    commission_percentage = row[4]
+    accounting_data = {
+        'total_money': total_money,
+        'revenue': revenue,
+        'tax_rate': tax_rate,
+        'profit': profit,
+        'commission_percentage': commission_percentage
+    }
 
 STOCK_CHANNEL_ID = 1103291698941014098
 ACCOUNTING_CHANNEL_ID = 1103291840393908274
@@ -47,23 +114,79 @@ total_money = accounting_data['total_money']
 revenue = accounting_data['revenue']
 tax_rate = accounting_data['tax_rate']
 commission_percentage = accounting_data['commission_percentage']
+profit = accounting_data['profit']
 
 
+def load_salaries_data():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="saloonv.2"
+    )
+    cursor = conn.cursor()
 
-# Mettre à jour les stocks et la comptabilité dans les fichiers JSON
-def update_json_files():
-    with open("stocks.json", "w") as f:
-        json.dump(item_stock, f)
+    cursor.execute("SELECT employee_id, salary FROM salaries")
+    for (employee_id, salary) in cursor:
+        salaries_data[str(employee_id)] = salary
 
-    with open("accounting.json", "w") as f:
-        json.dump(accounting_data, f)
+    cursor.close()
+    conn.close()
 
-    with open("salaries.json", "w") as f:
-        json.dump(salaries_data, f)
 
-def update_salaries_json():
-    with open("salaries.json", "w") as f:
-        json.dump(salaries_data, f)
+# Mettre à jour les stocks et la comptabilité dans la bdd
+def update_db_files():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="saloonv.2"
+    )
+    cursor = conn.cursor()
+
+    for item in item_stock.get("boissons", []):
+        nom = item['nom']
+        quantite = item['quantite']
+        prix_achat = item['prix_achat']
+        prix_vente = item['prix_vente']
+
+        cursor.execute("UPDATE drinks SET quantity=%s, purchase_price=%s, selling_price=%s WHERE name=%s",
+                       (quantite, prix_achat, prix_vente, nom))
+
+    for item in item_stock.get("nourriture", []):
+        nom = item['nom']
+        quantite = item['quantite']
+        prix_achat = item['prix_achat']
+        prix_vente = item['prix_vente']
+
+        cursor.execute("UPDATE meals SET quantity=%s, purchase_price=%s, selling_price=%s WHERE name=%s",
+                       (quantite, prix_achat, prix_vente, nom))
+
+    cursor.execute("UPDATE accounting SET total_money=%s, revenue=%s, tax_rate=%s, profit=%s, commission_percentage=%s",
+                   (accounting_data['total_money'], accounting_data['revenue'], accounting_data['tax_rate'],
+                    accounting_data['profit'], accounting_data['commission_percentage']))
+
+    for user_id, salary in salaries_data.items():
+        cursor.execute("UPDATE salaries SET salary=%s WHERE employee_id=%s", (salary, user_id))
+
+    conn.commit()
+    conn.close()
+
+
+def update_salaries_db():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="saloonv.2"
+    )
+    cursor = conn.cursor()
+
+    for user_id, salary in salaries_data.items():
+        cursor.execute("UPDATE salaries SET salary=%s WHERE employee_id=%s", (salary, user_id))
+
+    conn.commit()
+    conn.close()
 
 
 def update_stock(category, item_name, sold_quantity):
@@ -74,6 +197,13 @@ def update_stock(category, item_name, sold_quantity):
 
 
 def update_accounting(seller_id, sold_price, item_name, quantity, category):
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="saloonv.2"
+    )
+    cursor = conn.cursor()
     global total_money, revenue
 
     # Récupérer le prix d'achat
@@ -85,7 +215,7 @@ def update_accounting(seller_id, sold_price, item_name, quantity, category):
 
     # Calculer la commission
     profit = (sold_price - purchase_price) * quantity
-    commission = profit * 0.25
+    commission = profit / 2
 
     total_money += sold_price * quantity
     revenue += profit
@@ -99,6 +229,13 @@ def update_accounting(seller_id, sold_price, item_name, quantity, category):
     if str(seller_id) not in salaries_data:
         salaries_data[str(seller_id)] = 0
     salaries_data[str(seller_id)] += commission
+
+    # Mettre à jour le salaire dans la base de données
+    cursor.execute(f"UPDATE salaries SET salary = salary + {commission} WHERE employee_id = {seller_id}")
+    conn.commit()
+
+    cursor.close()
+    conn.close()
 
 
 async def update_stock_message():
@@ -118,7 +255,7 @@ async def update_stock_message():
             item_name = item_data["nom"]
             item_quantity = item_data["quantite"]
             item_price = item_data["prix_vente"]
-            stock_text += f"{item_name}: {item_quantity} (Prix de vente: {item_price}€)\n"
+            stock_text += f"{item_name}: {item_quantity} (Prix de vente: {item_price}$)\n"
 
     await stock_message.edit(content=stock_text)
 
@@ -135,11 +272,19 @@ async def update_accounting_message():
 
     taxes = revenue * tax_rate
     profit = revenue - taxes
-    accounting_text = f"**Argent total :** {total_money}\n**Chiffre d'affaires :** {revenue}\n**Taxes (20%) :** {taxes}\n**Bénéfice total :** {profit}"
+    accounting_text = f"**Argent total :** {total_money}\n**Chiffre d'affaires :** {revenue}\n**Taxes (5%) :** {taxes}\n**Bénéfice total :** {profit}"
 
     await accounting_message.edit(content=accounting_text)
 
 async def update_salary_message():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="saloonv.2"
+    )
+    cursor = conn.cursor()
+
     global salary_message_id
 
     salary_channel = bot.get_channel(SALARY_CHANNEL_ID)
@@ -155,11 +300,23 @@ async def update_salary_message():
     salary_text = "Salaires des employés :\n\n"
     for member in members:
         user_id = str(member.id)
-        if user_id not in salaries_data:
-            salaries_data[user_id] = 0
-        salary_text += f"{member.name}: {salaries_data[user_id]}€\n"
+
+        # Cherchez le salaire de l'utilisateur dans les résultats de la base de données
+        cursor.execute(f"SELECT salary FROM salaries WHERE employee_id = {user_id}")
+        result = cursor.fetchone()
+
+        if result is not None:
+            salary = result[0]
+        else:
+            salary = 0
+
+        salary_text += f"{member.name}: {salary}$\n"
 
     await salary_message.edit(content=salary_text)
+
+    cursor.close()
+    conn.close()
+
 
 async def send_sales_message():
     sales_channel = bot.get_channel(SALES_CHANNEL_ID)
@@ -286,16 +443,17 @@ class ItemSelect(discord.ui.Select):
         quantity_input_view = QuantityInputView(interaction.user, item, item_price)
         quantity = await quantity_input_view.wait_for_quantity()
 
+        print(quantity)
+
         if quantity is None:
-            await interaction.channel.send(content="Le temps imparti pour entrer la quantité est écoulé.",
-                                           ephemeral=True)
+            await interaction.channel.send(content="Le temps imparti pour entrer la quantité est écoulé.", ephemeral=True)
             return
 
         # Ajoutez l'article au ticket
-        ticket_view = interaction.message.view
-        await ticket_view.add_item(item, quantity)
+        #ticket_view = interaction.message.view
+        #await ticket_view.add_item(item, quantity)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=f"Article ajouté au ticket : {item}\nQuantité : {quantity}", ephemeral=True)
 
         price = item_price * quantity
@@ -305,7 +463,7 @@ class ItemSelect(discord.ui.Select):
 
         update_stock(category, item, quantity)
         update_accounting(interaction.user.id, item_price, item, quantity, category)
-        update_salaries_json()
+        update_salaries_db()
 
         await update_stock_message()
         await update_accounting_message()
@@ -313,7 +471,7 @@ class ItemSelect(discord.ui.Select):
         await send_sales_message()
 
 
-        update_json_files()
+        update_db_files()
 
 async def add_item(self, item, quantity):
     self.items.append(item)
@@ -346,14 +504,11 @@ class TicketView(discord.ui.View):
 @bot.event
 async def on_ready():
     print(f"{bot.user} has connected to Discord!")
+    load_salaries_data()
     await update_stock_message()
     await update_accounting_message()
     await update_salary_message()
     await send_sales_message()
-
-
-    sales_channel = bot.get_channel(SALES_CHANNEL_ID)
-    await sales_channel.send("Bienvenue sur le système de vente !", view=SalesView())
 
 
 @bot.event
